@@ -23,6 +23,9 @@ const int MAX_ROCKETS            =50;
 const int MAX_NUM_ENGINES        =30;
 const int MAX_ITERATIONS       =5000;
 
+const float ACCEPTABLE_DIFFERENCE = 0.15;
+
+
 enum fuelType{LOX, RP1};
 
 class Tank
@@ -135,6 +138,7 @@ private:
    int numEngines;
    int rocketNum;
    float maxHeight;
+   bool mateFound;
 
 public:
    Rocket(Tank* LOX, Tank* RP1)
@@ -147,6 +151,8 @@ public:
 
    Rocket(int rocketNumber)
    {
+      
+      mateFound = false;
       float d = (rand() % MAX_TANK_DIAMETER) + 1;
       float h = (rand() % MAX_TANK_HEIGHT) + 1;
       float percentFuel = (rand() % 100) / 100.0;
@@ -224,6 +230,11 @@ public:
       return maxAltitude;
    }
 
+   bool MateFound() const
+   {
+      return mateFound;
+   }
+
    void SetAltitude(float val)
    {
       altitude = val;
@@ -252,6 +263,11 @@ public:
    void SetRocketNum(int val)
    {
       rocketNum = val;
+   }
+
+   void SetMateFound(bool val)
+   {
+      mateFound = val;
    }
 
 
@@ -417,8 +433,62 @@ public:
 
    void MateGeneration()
    {
-        
+      for(int i = 0; i < numRockets; i++)
+      {
+         FindMate(generation[i]); 
+      }
+       
 
+   }
+
+   void FindMate(Rocket* r)
+   {
+      int numRocketsToChooseFrom = 0;
+      Rocket* possibleMates[MAX_ROCKETS];
+      FindSimilarRockets(r, possibleMates, numRocketsToChooseFrom);
+   }
+
+   void FindSimilarRockets(Rocket* r, Rocket* mates[MAX_ROCKETS], int& numPossibleMates)
+   {
+
+      float targetDiameter    = r->GetLoxTank()->GetDiameter();
+      float targetTotalHeight = r->GetLoxTank()->GetHeight() + r->GetRP1Tank()->GetHeight();
+      int   targetNumEngines  = r->GetNumEngines();
+      float targetMaxAltitude = r->GetMaxAltitude();
+
+      float aveDifference;
+
+      float diffDiameter, diffHeight, diffNumEngines, diffMaxHeight; 
+
+      for( int i = r->GetRocketNum(); i < numRockets; i++)
+      {
+         if(!generation[i]->MateFound())
+         {            
+            diffDiameter = GetDifference(targetDiameter,generation[i]->GetLoxTank()->GetDiameter());
+            diffHeight = GetDifference(targetTotalHeight,generation[i]->GetLoxTank()->GetHeight() + generation[i]->GetRP1Tank()->GetHeight());
+            diffNumEngines = GetDifference(targetNumEngines,generation[i]->GetNumEngines());
+            diffMaxHeight = GetDifference(targetMaxAltitude, generation[i]->GetMaxAltitude());
+
+            aveDifference = (diffDiameter + diffHeight + diffNumEngines + diffMaxHeight) / 4;
+
+            if(aveDifference <= ACCEPTABLE_DIFFERENCE)
+            {
+               mates[numPossibleMates] = generation[i];
+               numPossibleMates++;
+            }
+
+         }
+
+         
+      }
+
+
+
+   }
+
+   float GetDifference(float val1, float val2)
+   {
+      return fabs(1.0 - val1 / val2);
    }
 
 
