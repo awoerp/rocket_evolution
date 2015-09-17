@@ -23,7 +23,7 @@ const int MAX_ROCKETS            =50;
 const int MAX_NUM_ENGINES        =30;
 const int MAX_ITERATIONS       =5000;
 
-const float ACCEPTABLE_DIFFERENCE = 0.15;
+const float ACCEPTABLE_DIFFERENCE = 0.4;
 
 
 enum fuelType{LOX, RP1};
@@ -139,6 +139,8 @@ private:
    int rocketNum;
    float maxHeight;
    bool mateFound;
+   bool hasMated;
+   Rocket* mate;
 
 public:
    Rocket(Tank* LOX, Tank* RP1)
@@ -230,9 +232,19 @@ public:
       return maxAltitude;
    }
 
+   Rocket* GetMate() const
+   {
+      return mate;
+   }
+
    bool MateFound() const
    {
       return mateFound;
+   }
+
+   bool HasMated() const
+   {
+      return hasMated;
    }
 
    void SetAltitude(float val)
@@ -268,6 +280,16 @@ public:
    void SetMateFound(bool val)
    {
       mateFound = val;
+   }
+
+   void SetMate(Rocket* r)
+   {
+      mate = r;
+   }
+
+   void SetHasMated(bool val)
+   {
+      hasMated = val;
    }
 
 
@@ -367,7 +389,7 @@ public:
             r->SetVelocity(0);
             
          
-         PrintTimeStep(r, &t);
+         //PrintTimeStep(r, &t);
 
          maxIterationFlag = !(count <= MAX_ITERATIONS);
          if(maxIterationFlag)
@@ -397,9 +419,8 @@ public:
       Tank* lox = r->GetLoxTank();
       Tank* Rp1 = r->GetRP1Tank();
 
-      *file << "LOX HEIGHT RP1HEIGHT DIAMETER NumEngins" << endl
-            << lox->GetHeight() << " " << Rp1->GetHeight() << " " << lox->GetDiameter() << " " << r->GetNumEngines() << endl
-            << "Altitude Velocity timestep currentLox currentRP1" << endl;
+      *file << lox->GetHeight() << " " << Rp1->GetHeight() << " " << lox->GetDiameter() << " " << r->GetNumEngines() << " " << r->GetRocketNum() << endl;
+ 
       
    }
 
@@ -434,11 +455,10 @@ public:
    void MateGeneration()
    {
       for(int i = 0; i < numRockets; i++)
-      {
-         FindMate(generation[i]); 
-      }
-       
+         FindMate(generation[i]);
 
+      for(int i = 0; i < numRockets; i++)
+         Reproduce(generation[i]);
    }
 
    void FindMate(Rocket* r)
@@ -446,6 +466,30 @@ public:
       int numRocketsToChooseFrom = 0;
       Rocket* possibleMates[MAX_ROCKETS];
       FindSimilarRockets(r, possibleMates, numRocketsToChooseFrom);
+
+      if( numRocketsToChooseFrom > 0)
+      {
+         SelectMate(r, possibleMates[0]);
+      }
+      else
+      {
+         for(int i = r->GetRocketNum() + 1; i < numRockets; i++)
+         {
+            if(!generation[i]->MateFound())
+                SelectMate(r, generation[i]);
+         }
+      }
+
+      *file << "Rocket: ";
+
+      PrintRocket(r);
+
+      *file << "Similar Mates: " << numRocketsToChooseFrom << "\n";
+      for(int i = 0; i < numRocketsToChooseFrom; i++)
+      {
+         PrintRocket(possibleMates[i]);
+      }
+      *file << endl;
    }
 
    void FindSimilarRockets(Rocket* r, Rocket* mates[MAX_ROCKETS], int& numPossibleMates)
@@ -460,9 +504,9 @@ public:
 
       float diffDiameter, diffHeight, diffNumEngines, diffMaxHeight; 
 
-      for( int i = r->GetRocketNum(); i < numRockets; i++)
+      for(int i = r->GetRocketNum(); i < numRockets; i++)
       {
-         if(!generation[i]->MateFound())
+         if(!generation[i]->MateFound() && i != r->GetRocketNum())
          {            
             diffDiameter = GetDifference(targetDiameter,generation[i]->GetLoxTank()->GetDiameter());
             diffHeight = GetDifference(targetTotalHeight,generation[i]->GetLoxTank()->GetHeight() + generation[i]->GetRP1Tank()->GetHeight());
@@ -476,20 +520,36 @@ public:
                mates[numPossibleMates] = generation[i];
                numPossibleMates++;
             }
-
-         }
-
-         
+         }  
       }
-
-
-
    }
 
    float GetDifference(float val1, float val2)
    {
-      return fabs(1.0 - val1 / val2);
+      return fabs(1.0 - (val1 / val2));
    }
+
+   void SelectMate(Rocket* r1, Rocket* r2)
+   {
+      r1->SetMate(r2);
+      r2->SetMate(r1);
+      r1->SetMateFound(true);
+      r2->SetMateFound(true);
+   }
+
+   void Reproduce(Rocket* r)
+   {
+      if(!r->HasMated())
+      {
+         MatePair(r);
+      }
+   }
+
+   void MatePair(Rocket* r)
+   {
+
+   }
+
 
 
 };
@@ -499,11 +559,12 @@ int main()
    srand(time(NULL));
    ofstream file;
    file.open("Data.txt");
-   Generation sim = Generation(5,&file);
+   Generation sim = Generation(25,&file);
    sim.RandomizeGeneration();
    sim.TestGeneration();
    sim.SortGeneration();
    sim.PrintMaxAltitudes();
+   sim.MateGeneration();
    return 0;
 }
 
